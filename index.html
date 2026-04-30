@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#FFE5EC">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Snowball</title>
+<style>
+:root{
+  --primary:#FFB3C6;--primary-soft:#FFE5EC;--primary-deep:#FF8FAB;
+  --accent:#B5DEFF;--bg:#FFF8FA;--bg-elev:#FFFFFF;
+  --bg-frost:rgba(255,255,255,0.72);--bg-overlay:rgba(255,232,239,0.5);
+  --text:#3D2A35;--text-soft:#8E7B85;--text-mute:#C4B0BB;
+  --border:rgba(255,179,198,0.22);--shadow:0 8px 24px rgba(255,143,171,0.12);
+  --shadow-lg:0 16px 48px rgba(255,143,171,0.18);
+  --r-sm:12px;--r-md:18px;--r-lg:24px;--r-xl:32px;
+  --safe-top:env(safe-area-inset-top,20px);
+  --safe-bottom:env(safe-area-inset-bottom,16px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+input,textarea,[contenteditable]{-webkit-user-select:text;user-select:text}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,"SF Pro Display","PingFang SC","Helvetica Neue",sans-serif;background:#000;color:var(--text);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,textarea{font:inherit;color:inherit;background:none;border:none;outline:none;width:100%}
+#app{width:100%;height:100%;position:relative;overflow:hidden;background:var(--bg)}
+
+/* ––––– 壁纸层 ––––– */
+.wallpaper{position:absolute;inset:0;background:linear-gradient(135deg,#FFE5EC 0%,#FFD1DC 35%,#E8D5FF 70%,#C5E8FF 100%);background-size:cover;background-position:center;z-index:0}
+.wallpaper.has-img{background-image:var(–wp-img);background-size:cover}
+
+/* ––––– 状态栏 ––––– */
+.statusbar{position:fixed;top:0;left:0;right:0;height:calc(var(–safe-top) + 24px);padding:max(var(–safe-top),12px) 28px 0;display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:600;color:var(–text);z-index:1000;pointer-events:none}
+.statusbar .right{display:flex;align-items:center;gap:5px}
+.statusbar svg{width:18px;height:11px}
+
+/* ––––– 屏幕容器 ––––– */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;background:transparent;will-change:transform}
+.screen.app-screen{background:var(–bg)}
+.screen-enter{animation:enter .35s cubic-bezier(.32,.72,0,1)}
+.screen-exit{animation:exit .3s cubic-bezier(.32,.72,0,1) forwards}
+@keyframes enter{from{transform:translateX(100%)}to{transform:translateX(0)}}
+@keyframes exit{from{transform:translateX(0)}to{transform:translateX(100%)}}
+.screen-fade{animation:fade .25s ease}
+@keyframes fade{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
+
+/* ––––– 主屏 ––––– */
+.home{position:absolute;inset:0;padding:calc(var(–safe-top) + 32px) 22px calc(var(–safe-bottom) + 96px);display:flex;flex-direction:column;z-index:1}
+.home-grid{flex:1;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:max-content;gap:22px 14px;align-content:start;padding-top:8px}
+.app-icon{display:flex;flex-direction:column;align-items:center;gap:6px;animation:pop .5s cubic-bezier(.5,1.6,.5,1) backwards}
+.app-icon:nth-child(1){animation-delay:.05s}.app-icon:nth-child(2){animation-delay:.1s}.app-icon:nth-child(3){animation-delay:.15s}.app-icon:nth-child(4){animation-delay:.2s}.app-icon:nth-child(5){animation-delay:.25s}.app-icon:nth-child(6){animation-delay:.3s}
+@keyframes pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+.app-icon-bg{width:62px;height:62px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:30px;background:var(–bg-frost);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:var(–shadow);transition:transform .15s ease;background-size:cover;background-position:center}
+.app-icon:active .app-icon-bg{transform:scale(.92)}
+.app-icon-label{font-size:12px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.35);font-weight:500;max-width:72px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ––––– Dock ––––– */
+.dock{position:absolute;bottom:calc(var(–safe-bottom) + 8px);left:18px;right:18px;background:var(–bg-frost);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:28px;padding:12px;display:flex;justify-content:space-around;align-items:center;z-index:5;border:.5px solid rgba(255,255,255,.4)}
+.dock .app-icon-label{display:none}
+.dock .app-icon-bg{width:54px;height:54px;font-size:26px;border-radius:14px;background:rgba(255,255,255,.6)}
+
+/* ––––– Banner / Pages ––––– */
+.page-header{position:sticky;top:0;background:var(–bg-frost);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);padding:calc(var(–safe-top) + 8px) 16px 12px;display:flex;align-items:center;gap:12px;z-index:10;border-bottom:.5px solid var(–border)}
+.page-header .title{font-size:17px;font-weight:600;flex:1;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.page-header .subtitle{font-size:11px;color:var(–text-soft);font-weight:400;margin-top:1px}
+.btn-icon{width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(–primary-deep);font-size:20px;transition:background .15s}
+.btn-icon:active{background:var(–primary-soft)}
+.btn-text{color:var(–primary-deep);font-size:16px;font-weight:500;padding:6px 8px}
+.btn-text:active{opacity:.6}
+
+.page-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* ––––– Form / List ––––– */
+.section{padding:8px 16px 4px;font-size:13px;color:var(–text-soft);text-transform:uppercase;letter-spacing:.5px;margin-top:16px;font-weight:500}
+.list{background:var(–bg-elev);border-radius:var(–r-md);margin:0 14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.list-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:.5px solid var(–border);min-height:52px;transition:background .12s}
+.list-item:last-child{border-bottom:none}
+.list-item:active{background:var(–primary-soft)}
+.list-item .li-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;background:var(–primary-soft);color:var(–primary-deep);flex-shrink:0}
+.list-item .li-main{flex:1;min-width:0;font-size:15px}
+.list-item .li-sub{font-size:12px;color:var(–text-mute);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-item .li-right{font-size:14px;color:var(–text-mute);display:flex;align-items:center;gap:6px;flex-shrink:0;max-width:50%}
+.list-item .li-right .arrow{opacity:.5}
+.list-item input[type=“text”],.list-item input[type=“password”]{flex:1;text-align:right;font-size:14px;color:var(–text-soft)}
+
+/* ––––– 按钮 ––––– */
+.btn-primary{background:var(–primary-deep);color:#fff;padding:13px 24px;border-radius:var(–r-md);font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;transition:transform .1s}
+.btn-primary:active{transform:scale(.97)}
+.btn-secondary{background:var(–primary-soft);color:var(–primary-deep);padding:13px 24px;border-radius:var(–r-md);font-size:15px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-danger{background:#FFE5E8;color:#E94560;padding:13px 24px;border-radius:var(–r-md);font-size:15px;font-weight:500}
+.btn-block{width:100%;margin:8px 14px;width:calc(100% - 28px)}
+
+/* ––––– Modal ––––– */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);backdrop-filter:blur(4px);z-index:2000;display:flex;align-items:flex-end;justify-content:center;animation:fadeBg .25s ease}
+@keyframes fadeBg{from{opacity:0}to{opacity:1}}
+.modal{background:var(–bg);border-radius:24px 24px 0 0;width:100%;max-height:90vh;display:flex;flex-direction:column;animation:slideUp .3s cubic-bezier(.32,.72,0,1)}
+.modal.center{border-radius:24px;margin:auto;width:calc(100% - 40px);max-width:380px}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-head{padding:18px 18px 8px;display:flex;justify-content:space-between;align-items:center}
+.modal-title{font-size:17px;font-weight:600}
+.modal-body{padding:8px 18px 24px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.modal-handle{width:36px;height:5px;background:var(–text-mute);border-radius:3px;margin:8px auto;opacity:.4}
+
+/* ––––– 头像 ––––– */
+.avatar{border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;color:#fff;flex-shrink:0;background-size:cover;background-position:center;background-color:var(–primary-deep)}
+.avatar.sm{width:30px;height:30px;font-size:13px}
+.avatar.md{width:42px;height:42px;font-size:16px}
+.avatar.lg{width:64px;height:64px;font-size:24px}
+.avatar.xl{width:96px;height:96px;font-size:36px}
+
+/* ––––– 聊天 ––––– */
+.chat-list-empty{padding:48px 24px;text-align:center;color:var(–text-mute)}
+.conv-item{display:flex;gap:12px;padding:14px 16px;border-bottom:.5px solid var(–border);align-items:center}
+.conv-item:active{background:var(–primary-soft)}
+.conv-meta{flex:1;min-width:0}
+.conv-title{font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+.conv-title span:first-child{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.conv-time{font-size:12px;color:var(–text-mute);font-weight:400;flex-shrink:0}
+.conv-preview{font-size:13px;color:var(–text-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px}
+
+/* 对话视图 */
+.chat-view{display:flex;flex-direction:column;height:100%;background:var(–bg)}
+.chat-msgs{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 12px 8px;display:flex;flex-direction:column;gap:16px}
+.msg{display:flex;gap:8px;align-items:flex-end;animation:msgIn .25s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.msg.me{flex-direction:row-reverse}
+.msg-bubble-wrap{display:flex;flex-direction:column;max-width:78%;gap:3px}
+.msg.me .msg-bubble-wrap{align-items:flex-end}
+.msg-bubble{padding:10px 14px;border-radius:18px;font-size:15px;line-height:1.45;word-wrap:break-word;white-space:pre-wrap;background:var(–bg-elev);color:var(–text);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.msg.me .msg-bubble{background:var(–primary-deep);color:#fff;border-bottom-right-radius:4px}
+.msg.ai .msg-bubble{border-bottom-left-radius:4px}
+.msg-meta{font-size:10.5px;color:var(–text-mute);padding:0 6px;display:none}
+.msg-bubble-wrap.show-meta .msg-meta{display:block}
+.msg-error .msg-bubble{background:#FFE5E8;color:#C53154}
+
+.chat-input-area{padding:8px 10px calc(var(–safe-bottom) + 8px);background:var(–bg-frost);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:.5px solid var(–border)}
+.chat-input-row{display:flex;align-items:flex-end;gap:8px}
+.chat-input{flex:1;min-height:38px;max-height:140px;background:var(–bg-elev);border-radius:20px;padding:9px 14px;font-size:15px;line-height:1.4;border:1px solid var(–border);overflow-y:auto;resize:none;color:var(–text)}
+.chat-send{width:38px;height:38px;border-radius:50%;background:var(–primary-deep);color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .1s,opacity .15s}
+.chat-send:disabled{opacity:.4}
+.chat-send:active:not(:disabled){transform:scale(.92)}
+.chat-toolbar{display:flex;gap:8px;padding:0 4px 8px;align-items:center;flex-wrap:wrap}
+.chip{padding:5px 11px;background:var(–bg-elev);border-radius:14px;font-size:12px;color:var(–text-soft);display:inline-flex;align-items:center;gap:4px;border:.5px solid var(–border)}
+.chip:active{background:var(–primary-soft)}
+.chip.active{background:var(–primary-soft);color:var(–primary-deep);border-color:var(–primary-deep)}
+
+/* ––––– 颜色选择 ––––– */
+.color-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;padding:12px 0}
+.color-dot{aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;cursor:pointer}
+.color-dot.active::after{content:“✓”;font-weight:700}
+.color-input{display:flex;gap:10px;align-items:center;margin-top:8px}
+.color-input input[type=“color”]{-webkit-appearance:none;width:48px;height:48px;border:none;border-radius:12px;background:none;cursor:pointer;overflow:hidden;padding:0}
+.color-input input[type=“color”]::-webkit-color-swatch-wrapper{padding:0}
+.color-input input[type=“color”]::-webkit-color-swatch{border:none;border-radius:12px}
+
+/* 主题预览 */
+.theme-card{display:flex;flex-direction:column;border-radius:var(–r-md);overflow:hidden;border:2px solid transparent;transition:border-color .15s}
+.theme-card.active{border-color:var(–primary-deep)}
+.theme-preview{height:64px;display:flex;align-items:flex-end;padding:8px;gap:4px}
+.theme-preview .dot{width:14px;height:14px;border-radius:50%}
+
+/* 输入框 */
+.input-block{background:var(–bg-elev);border-radius:var(–r-md);margin:0 14px;padding:0;overflow:hidden}
+.input-row{display:flex;flex-direction:column;padding:10px 14px;border-bottom:.5px solid var(–border)}
+.input-row:last-child{border-bottom:none}
+.input-row label{font-size:11px;color:var(–text-mute);margin-bottom:3px;font-weight:500;letter-spacing:.3px}
+.input-row input,.input-row textarea{font-size:15px;background:none}
+.input-row textarea{min-height:80px;resize:vertical;line-height:1.5}
+
+.help-text{font-size:12px;color:var(–text-soft);padding:8px 18px;line-height:1.5}
+
+/* 加载点 */
+.loading-dots{display:inline-flex;gap:3px;align-items:center;padding:4px 8px}
+.loading-dots span{width:6px;height:6px;border-radius:50%;background:var(–text-mute);animation:dot 1.4s infinite}
+.loading-dots span:nth-child(2){animation-delay:.2s}
+.loading-dots span:nth-child(3){animation-delay:.4s}
+@keyframes dot{0%,60%,100%{opacity:.3;transform:scale(.7)}30%{opacity:1;transform:scale(1)}}
+
+/* Toast */
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;padding:10px 20px;border-radius:20px;font-size:14px;z-index:5000;animation:toastIn .25s ease;backdrop-filter:blur(8px);max-width:80vw;text-align:center}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,-10px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* 空状态 */
+.empty{padding:48px 24px;text-align:center;color:var(–text-mute);font-size:14px}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:.5}
+
+/* select 样式 */
+select{font:inherit;color:inherit;background:var(–bg-elev);border:.5px solid var(–border);border-radius:10px;padding:6px 10px;font-size:14px;-webkit-appearance:none;appearance:none;background-image:url(“data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8' fill='%23999'><path d='M6 8L0 0h12z'/></svg>”);background-repeat:no-repeat;background-position:right 10px center;background-size:10px;padding-right:28px}
+
+/* 滑块 */
+input[type=“range”]{-webkit-appearance:none;width:100%;height:4px;background:var(–primary-soft);border-radius:2px;outline:none}
+input[type=“range”]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;background:var(–primary-deep);border-radius:50%;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+
+/* 隐藏 */
+.hidden{display:none !important}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="wallpaper" id="wallpaper"></div>
+  <div class="statusbar" id="statusbar">
+    <span id="sb-time">9:41</span>
+    <div class="right">
+      <span style="font-size:13px">●●●●</span>
+      <svg viewBox="0 0 24 14" fill="currentColor"><rect x="1" y="1" width="20" height="12" rx="3" stroke="currentColor" stroke-width="1" fill="none"/><rect x="3" y="3" width="14" height="8" rx="1.5"/><rect x="22" y="5" width="1.5" height="4" rx=".5"/></svg>
+    </div>
+  </div>
+  <div id="root"></div>
+</div>
+
+<script>
+"use strict";
+
+/* ============ 工具 ============ */
+const $ = (sel,root=document)=>root.querySelector(sel);
+const $$ = (sel,root=document)=>[...root.querySelectorAll(sel)];
+const h = (tag,props={},...children)=>{
+  const el=document.createElement(tag);
+  for(const k in props){
+    if(k==="class")el.className=props[k];
+    else if(k==="style"&&typeof props[k]==="object")Object.assign(el.style,props[k]);
+    else if(k.startsWith("on")&&typeof props[k]==="function")el.addEventListener(k.slice(2).toLowerCase(),props[k]);
+    else if(k==="html")el.innerHTML=props[k];
+    else if(k in el)el[k]=props[k];
+    else el.setAttribute(k,props[k]);
+  }
+  for(const c of children.flat()){
+    if(c==null||c===false)continue;
+    el.appendChild(typeof c==="string"||typeof c==="number"?document.createTextNode(c):c);
+  }
+  return el;
+};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const fmt=(ts)=>{
+  if(!ts)return"";
+  const d=new Date(ts),now=new Date();
+  const sameDay=d.toDateString()===now.toDateString();
+  if(sameDay)return d.toTimeString().slice(0,5);
+  const yest=new Date(now);yest.setDate(now.getDate()-1);
+  if(d.toDateString()===yest.toDateString())return"昨天";
+  if(now-d<7*24*3600*1000){return["周日","周一","周二","周三","周四","周五","周六"][d.getDay()]}
+  return`${d.getMonth()+1}/${d.getDate()}`;
+};
+const escapeHtml=(s)=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+
+function toast(msg,duration=2000){
+  $$(".toast").forEach(t=>t.remove());
+  const t=h("div",{class:"toast"},msg);
+  document.body.appendChild(t);
+  setTimeout(()=>{t.style.opacity=0;t.style.transition="opacity .2s";setTimeout(()=>t.remove(),200);},duration);
+}
+
+function modal({title,body,actions,size="sheet",onClose}={}){
+  const bg=h("div",{class:"modal-bg"});
+  const m=h("div",{class:"modal"+(size==="center"?" center":"")});
+  if(size==="sheet")m.appendChild(h("div",{class:"modal-handle"}));
+  if(title)m.appendChild(h("div",{class:"modal-head"},
+    h("div",{class:"modal-title"},title),
+    h("button",{class:"btn-text",onClick:close},"完成")
+  ));
+  const bodyEl=h("div",{class:"modal-body"});
+  if(typeof body==="string")bodyEl.innerHTML=body;
+  else if(body instanceof Node)bodyEl.appendChild(body);
+  else if(typeof body==="function")body(bodyEl,close);
+  m.appendChild(bodyEl);
+  if(actions){
+    const acts=h("div",{style:{display:"flex",gap:8,padding:"0 18px 18px"}});
+    for(const a of actions){
+      acts.appendChild(h("button",{class:a.danger?"btn-danger":(a.primary?"btn-primary":"btn-secondary"),style:{flex:1},onClick:()=>{a.onClick&&a.onClick(close)}},a.label));
+    }
+    m.appendChild(acts);
+  }
+  bg.appendChild(m);
+  bg.addEventListener("click",e=>{if(e.target===bg)close();});
+  document.body.appendChild(bg);
+  function close(){bg.style.opacity=0;bg.style.transition="opacity .2s";m.style.transform="translateY(100%)";m.style.transition="transform .25s ease";setTimeout(()=>{bg.remove();onClose&&onClose();},250);}
+  return{close,el:m};
+}
+
+function confirm({title,message,danger,confirmLabel="确定"}){
+  return new Promise(res=>{
+    modal({size:"center",title,body:h("div",{style:{padding:"4px 0 16px",color:"var(--text-soft)",fontSize:14,lineHeight:1.5}},message),actions:[
+      {label:"取消",onClick:c=>{c();res(false)}},
+      {label:confirmLabel,danger,primary:!danger,onClick:c=>{c();res(true)}}
+    ]});
+  });
+}
+
+/* ============ 存储 ============ */
+const Store={
+  KEY:"snowball.v1",
+  data:null,
+  load(){
+    try{
+      const raw=localStorage.getItem(this.KEY);
+      this.data=raw?JSON.parse(raw):this.defaults();
+      // 补全字段
+      const def=this.defaults();
+      for(const k in def)if(!(k in this.data))this.data[k]=def[k];
+    }catch(e){this.data=this.defaults()}
+    return this.data;
+  },
+  save(){try{localStorage.setItem(this.KEY,JSON.stringify(this.data))}catch(e){toast("保存失败:"+e.message)}},
+  defaults(){return{
+    deviceName:"Snowball",
+    user:{name:"昭昭",avatar:null},
+    theme:{
+      preset:"macaron",
+      primary:"#FF8FAB",
+      primarySoft:"#FFE5EC",
+      bg:"#FFF8FA",
+      bgElev:"#FFFFFF",
+      text:"#3D2A35",
+      textSoft:"#8E7B85"
+    },
+    wallpaper:null,
+    apiKeys:{
+      openai:"",
+      anthropic:"",
+      glm:"",
+      siliconflow:"",
+      deepseek:""
+    },
+    apiBaseUrls:{
+      openai:"https://api.openai.com/v1",
+      anthropic:"https://api.anthropic.com/v1",
+      glm:"https://open.bigmodel.cn/api/paas/v4",
+      siliconflow:"https://api.siliconflow.cn/v1",
+      deepseek:"https://api.deepseek.com/v1"
+    },
+    customModels:{openai:[],anthropic:[],glm:[],siliconflow:[],deepseek:[]},
+    assistants:[
+      {id:"default",name:"默认助手",avatar:null,systemPrompt:"",defaultProvider:"openai",defaultModel:"gpt-4o-mini",temperature:0.7,note:"",createdAt:Date.now()}
+    ],
+    conversations:[],
+    settings:{lastProvider:"openai",lastModel:"gpt-4o-mini",showMeta:true,enableMemory:true,memoryLimit:30}
+  }}
+};
+
+/* ============ 主题预设 ============ */
+const THEMES={
+  macaron:{
+    name:"奶油马卡龙",primary:"#FF8FAB",primarySoft:"#FFE5EC",bg:"#FFF8FA",bgElev:"#FFFFFF",text:"#3D2A35",textSoft:"#8E7B85",
+    wallpaper:"linear-gradient(135deg,#FFE5EC 0%,#FFD1DC 35%,#E8D5FF 70%,#C5E8FF 100%)"
+  },
+  girly:{
+    name:"少女心",primary:"#FF6B9D",primarySoft:"#FFD6E5",bg:"#FFF5F8",bgElev:"#FFFFFF",text:"#4A1F38",textSoft:"#996680",
+    wallpaper:"linear-gradient(135deg,#FFB6CE 0%,#FF9FBE 50%,#FFB3D1 100%)"
+  },
+  dopamine:{
+    name:"多巴胺",primary:"#FF6B35",primarySoft:"#FFE0D1",bg:"#FFFAF5",bgElev:"#FFFFFF",text:"#332014",textSoft:"#856B5C",
+    wallpaper:"linear-gradient(135deg,#FFB347 0%,#FF6B9D 40%,#A78BFA 80%,#60A5FA 100%)"
+  },
+  dark:{
+    name:"暗黑可爱",primary:"#E879F9",primarySoft:"#3F1F45",bg:"#1A1320",bgElev:"#26192E",text:"#F4E5F7",textSoft:"#B49ABC",
+    wallpaper:"linear-gradient(135deg,#1A0B2E 0%,#3D1A5C 50%,#0F1B3D 100%)"
+  },
+  jelly:{
+    name:"果冻Y2K",primary:"#A78BFA",primarySoft:"#E9DBFC",bg:"#F8F4FF",bgElev:"#FFFFFF",text:"#2D1F4A",textSoft:"#7B6B99",
+    wallpaper:"linear-gradient(135deg,#C7D2FE 0%,#FBCFE8 35%,#A5F3FC 70%,#DDD6FE 100%)"
+  },
+  jp:{
+    name:"日系极简",primary:"#A89483",primarySoft:"#F0E8DD",bg:"#FAF7F2",bgElev:"#FFFFFF",text:"#3D342B",textSoft:"#857A6E",
+    wallpaper:"linear-gradient(135deg,#F0E8DD 0%,#E5D5C0 50%,#DCC9B4 100%)"
+  }
+};
+
+function applyTheme(){
+  const t=Store.data.theme;
+  const root=document.documentElement;
+  root.style.setProperty("--primary-deep",t.primary);
+  root.style.setProperty("--primary-soft",t.primarySoft);
+  // primary作为主色更亮的版本
+  root.style.setProperty("--primary",t.primary);
+  root.style.setProperty("--bg",t.bg);
+  root.style.setProperty("--bg-elev",t.bgElev);
+  root.style.setProperty("--text",t.text);
+  root.style.setProperty("--text-soft",t.textSoft);
+  root.style.setProperty("--text-mute",t.textSoft+"99");
+  root.style.setProperty("--border",t.primary+"22");
+  // 背景毛玻璃透明度
+  const isDark=t.preset==="dark"||isColorDark(t.bg);
+  root.style.setProperty("--bg-frost",isDark?"rgba(38,25,46,0.7)":"rgba(255,255,255,0.72)");
+  document.querySelector('meta[name="theme-color"]').setAttribute("content",t.primarySoft);
+  // 壁纸
+  const wp=$("#wallpaper");
+  if(Store.data.wallpaper){
+    wp.classList.add("has-img");
+    wp.style.setProperty("--wp-img",`url(${Store.data.wallpaper})`);
+    wp.style.background=`url(${Store.data.wallpaper}) center/cover`;
+  }else{
+    wp.classList.remove("has-img");
+    wp.style.background=THEMES[t.preset]?.wallpaper||THEMES.macaron.wallpaper;
+  }
+}
+function isColorDark(hex){
+  if(!hex||!hex.startsWith("#"))return false;
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return(r*0.299+g*0.587+b*0.114)<128;
+}
+
+/* ============ 头像 ============ */
+function renderAvatar(opts={}){
+  // opts: name, avatar(url), size('sm'|'md'|'lg'|'xl'), color
+  const{name="?",avatar,size="md",color}=opts;
+  const el=h("div",{class:`avatar ${size}`});
+  if(avatar){el.style.backgroundImage=`url(${avatar})`;el.style.backgroundColor="transparent"}
+  else{
+    el.textContent=(name||"?").trim().charAt(0).toUpperCase();
+    if(color)el.style.backgroundColor=color;
+  }
+  return el;
+}
+
+/* ============ 路由 ============ */
+const Router={
+  stack:["home"],
+  current(){return this.stack[this.stack.length-1]},
+  go(view,opts){
+    this.stack.push({view,opts});
+    render();
+  },
+  back(){
+    if(this.stack.length<=1)return;
+    this.stack.pop();
+    render();
+  },
+  reset(){this.stack=["home"];render();}
+};
+
+function render(){
+  const top=Router.stack[Router.stack.length-1];
+  const view=typeof top==="string"?top:top.view;
+  const opts=typeof top==="object"?top.opts:null;
+  const root=$("#root");
+  root.innerHTML="";
+  let screen;
+  if(view==="home")screen=renderHome();
+  else if(view==="chat")screen=renderChatList();
+  else if(view==="conv")screen=renderConv(opts);
+  else if(view==="settings")screen=renderSettings();
+  else if(view==="api-keys")screen=renderApiKeys();
+  else if(view==="profile")screen=renderProfile();
+  else if(view==="appearance")screen=renderAppearance();
+  else if(view==="assistants")screen=renderAssistants();
+  else if(view==="assistant-edit")screen=renderAssistantEdit(opts);
+  else if(view==="about")screen=renderAbout();
+  else screen=renderHome();
+  screen.classList.add("screen-fade");
+  root.appendChild(screen);
+  // status bar 颜色根据视图
+  $("#statusbar").style.color=view==="home"?"#fff":"var(--text)";
+  $("#statusbar").style.textShadow=view==="home"?"0 1px 2px rgba(0,0,0,.3)":"none";
+}
+
+/* ============ 主屏 ============ */
+function renderHome(){
+  const screen=h("div",{class:"home"});
+  const apps=[
+    {id:"chat",label:"聊天",icon:"💬",bg:"linear-gradient(135deg,#FFB3C6,#FF8FAB)"},
+    {id:"settings",label:"自定义",icon:"⚙️",bg:"linear-gradient(135deg,#C5E8FF,#85B8FF)"},
+    {id:"assistants",label:"助手",icon:"🤖",bg:"linear-gradient(135deg,#E8D5FF,#B89FFF)"},
+    {id:"about",label:"关于",icon:"💝",bg:"linear-gradient(135deg,#FFE5EC,#FFB3C6)"}
+  ];
+  const grid=h("div",{class:"home-grid"});
+  for(const a of apps){
+    grid.appendChild(h("div",{class:"app-icon",onClick:()=>Router.go(a.id)},
+      h("div",{class:"app-icon-bg",style:{background:a.bg}},a.icon),
+      h("div",{class:"app-icon-label"},a.label)
+    ));
+  }
+  screen.appendChild(grid);
+  // dock - 把最常用的放到 dock
+  const dock=h("div",{class:"dock"},
+    h("div",{class:"app-icon",onClick:()=>Router.go("chat")},h("div",{class:"app-icon-bg"},"💬")),
+    h("div",{class:"app-icon",onClick:()=>Router.go("assistants")},h("div",{class:"app-icon-bg"},"🤖")),
+    h("div",{class:"app-icon",onClick:()=>Router.go("settings")},h("div",{class:"app-icon-bg"},"⚙️")),
+    h("div",{class:"app-icon",onClick:()=>Router.go("about")},h("div",{class:"app-icon-bg"},"💝"))
+  );
+  screen.appendChild(dock);
+  return screen;
+}
+
+/* ============ 关于 ============ */
+function renderAbout(){
+  const s=h("div",{class:"screen app-screen"});
+  s.appendChild(h("div",{class:"page-header"},
+    h("button",{class:"btn-text",onClick:()=>Router.back()},"← 返回"),
+    h("div",{class:"title"},"关于"),
+    h("div",{style:{width:60}})
+  ));
+  const body=h("div",{class:"page-body"});
+  body.innerHTML=`
+    <div style="padding:32px 24px;text-align:center">
+      <div style="font-size:64px;margin-bottom:8px">🐙</div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:4px">${Store.data.deviceName}</div>
+      <div style="font-size:13px;color:var(--text-soft)">v0.1 · 你的小宇宙</div>
+    </div>
+    <div style="padding:0 24px 24px;color:var(--text-soft);font-size:14px;line-height:1.7">
+      这是属于昭昭的小手机。<br>
+      所有数据只存在你的浏览器里，不会上传到任何地方。<br>
+      想加新功能就跟克克说一声。<br><br>
+      Made with 💗 by 章鱼cc
+    </div>
+  `;
+  s.appendChild(body);
+  return s;
+}
+
+/* ============ 聊天列表 ============ */
+function renderChatList(){
+  const s=h("div",{class:"screen app-screen"});
+  const header=h("div",{class:"page-header"},
+    h("button",{class:"btn-text",onClick:()=>Router.back()},"← 返回"),
+    h("div",{class:"title"},"聊天"),
+    h("button",{class:"btn-icon",onClick:()=>newConv()},h("span",{style:{fontSize:24,fontWeight:300}},"+"))
+  );
+  s.appendChild(header);
+  const body=h("div",{class:"page-body"});
+  const convs=[...Store.data.conversations].sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  if(convs.length===0){
+    body.appendChild(h("div",{class:"empty"},
+      h("div",{class:"empty-icon"},"💭"),
+      h("div",{},"还没有对话"),
+      h("div",{style:{marginTop:8,fontSize:13}},"点右上角 + 开始第一个对话")
+    ));
+  }else{
+    for(const c of convs){
+      const asst=Store.data.assistants.find(a=>a.id===c.assistantId)||Store.data.assistants[0];
+      const lastMsg=c.messages?c.messages[c.messages.length-1]:null;
+      const item=h("div",{class:"conv-item",onClick:()=>Router.go("conv",{id:c.id})},
+        renderAvatar({name:asst?.name||"?",avatar:asst?.avatar,size:"md",color:Store.data.theme.primary}),
+        h("div",{class:"conv-meta"},
+          h("div",{class:"conv-title"},
+            h("span",{},c.title||"新对话"),
+            h("span",{class:"conv-time"},fmt(c.updatedAt))
+          ),
+          h("div",{class:"conv-preview"},lastMsg?(lastMsg.role==="user"?"你: ":"")+(lastMsg.content||"").slice(0,40):"开始聊天吧～")
+        )
+      );
+      // 长按删除
+      let pressTimer;
+      item.addEventListener("touchstart",()=>{pressTimer=setTimeout(async()=>{const ok=await confirm({title:"删除对话",message:"删除后无法恢复。",danger:true,confirmLabel:"删除"});if(ok){Store.data.conversations=Store.data.conversations.filter(x=>x.id!==c.id);Store.save();render();}},600);});
+      item.addEventListener("touchend",()=>clearTimeout(pressTimer));
+      item.addEventListener("touchmove",()=>clearTimeout(pressTimer));
+      body.appendChild(item);
+    }
+  }
+  s.appendChild(body);
+  return s;
+}
+
+function newConv(){
+  // 选助手
+  const sheet=modal({title:"选择助手",body:(b,close)=>{
+    const list=h("div",{class:"list",style:{margin:"8px 0"}});
+    for(const a of Store.data.assistants){
+      list.appendChild(h("div",{class:"list-item",onClick:()=>{
+        const c={id:uid(),assistantId:a.id,title:"",messages:[],createdAt:Date.now(),updatedAt:Date.now()};
+        Store.data.conversations.push(c);Store.save();close();
+        Router.go("conv",{id:c.id});
+      }},
+        renderAvatar({name:a.name,avatar:a.avatar,size:"md",color:Store.data.theme.primary}),
+        h("div",{class:"li-main"},a.name,h("div",{class:"li-sub"},a.note||a.systemPrompt?.slice(0,40)||"无提示词"))
+      ));
+    }
+    list.appendChild(h("div",{class:"list-item",onClick:()=>{close();Router.go("assistants")}},
+      h("div",{class:"li-icon"},"+"),
+      h("div",{class:"li-main"},"管理助手...")
+    ));
+    b.appendChild(list);
+  }});
+}
+
+/* ============ 对话视图 ============ */
+let activeStreams=new Map(); // convId -> AbortController
+function renderConv(opts){
+  const conv=Store.data.conversations.find(c=>c.id===opts?.id);
+  if(!conv){Router.back();return h("div");}
+  const asst=Store.data.assistants.find(a=>a.id===conv.assistantId)||Store.data.assistants[0];
+
+  const s=h("div",{class:"screen app-screen"});
+  // header
+  let curProvider=conv.lastProvider||asst.defaultProvider||Store.data.settings.lastProvider;
+  let curModel=conv.lastModel||asst.defaultModel||Store.data.settings.lastModel;
+  let curTemp=conv.temperature??asst.temperature??0.7;
+
+  const header=h("div",{class:"page-header"},
+    h("button",{class:"btn-text",onClick:()=>Router.back()},"← 返回"),
+    h("div",{class:"title",style:{display:"flex",flexDirection:"column",gap:0}},
+      h("div",{},asst.name),
+      h("div",{class:"subtitle",id:"conv-sub"},`${curProvider} · ${curModel}`)
+    ),
+    h("button",{class:"btn-icon",onClick:()=>showConvMenu(conv,asst)},"⋯")
+  );
+  s.appendChild(header);
+
+  const msgsEl=h("div",{class:"chat-msgs",id:"chat-msgs"});
+  s.appendChild(msgsEl);
+
+  // 输入区
+  const inputArea=h("div",{class:"chat-input-area"});
+  const toolbar=h("div",{class:"chat-toolbar"});
+  const modelChip=h("button",{class:"chip active",onClick:()=>showModelPicker()});
+  const tempChip=h("button",{class:"chip",onClick:()=>showTempPicker()});
+  function refreshChips(){
+    modelChip.innerHTML=`🤖 ${curProvider} · ${curModel.length>20?curModel.slice(0,20)+"...":curModel}`;
+    tempChip.innerHTML=`🌡 ${curTemp.toFixed(1)}`;
+    $("#conv-sub")&&($("#conv-sub").textContent=`${curProvider} · ${curModel}`);
+  }
+  refreshChips();
+  toolbar.appendChild(modelChip);
+  toolbar.appendChild(tempChip);
+  inputArea.appendChild(toolbar);
+
+  const inputRow=h("div",{class:"chat-input-row"});
+  const ta=h("textarea",{class:"chat-input",placeholder:"说点什么...",rows:1});
+  ta.addEventListener("input",()=>{
+    ta.style.height="auto";
+    ta.style.height=Math.min(140,ta.scrollHeight)+"px";
+    sendBtn.disabled=!ta.value.trim();
+  });
+  const sendBtn=h("button",{class:"chat-send",disabled:true,onClick:send},"↑");
+  inputRow.appendChild(ta);
+  inputRow.appendChild(sendBtn);
+  inputArea.appendChild(inputRow);
+  s.appendChild(inputArea);
+
+  // 渲染历史消息
+  function renderMsgs(){
+    msgsEl.innerHTML="";
+    if(asst.systemPrompt){
+      msgsEl.appendChild(h("div",{style:{fontSize:11,color:"var(--text-mute)",textAlign:"center",padding:"4px 16px"}},`系统提示词已激活 · ${asst.systemPrompt.length} 字`));
+    }
+    for(const m of conv.messages){
+      msgsEl.appendChild(renderMsg(m));
+    }
+    requestAnimationFrame(()=>{msgsEl.scrollTop=msgsEl.scrollHeight});
+  }
+  function renderMsg(m){
+    const wrap=h("div",{class:"msg "+(m.role==="user"?"me":"ai")+(m.error?" msg-error":"")});
+    const av=m.role==="user"
+      ?renderAvatar({name:Store.data.user.name,avatar:Store.data.user.avatar,size:"sm",color:Store.data.theme.primary})
+      :renderAvatar({name:asst.name,avatar:asst.avatar,size:"sm",color:Store.data.theme.primary});
+    const bw=h("div",{class:"msg-bubble-wrap"+(Store.data.settings.showMeta?" show-meta":"")});
+    const bubble=h("div",{class:"msg-bubble"},m.content||"");
+    bubble.dataset.msgId=m.id;
+    if(m.streaming)bubble.innerHTML=(m.content||"")+'<span class="loading-dots"><span></span><span></span><span></span></span>';
+    bw.appendChild(bubble);
+    if(m.role==="assistant"&&!m.error){
+      const meta=[];
+      if(m.model)meta.push(m.model);
+      if(m.tokens)meta.push(`${m.tokens.total||(m.tokens.input+m.tokens.output)||"?"} tokens`);
+      if(meta.length)bw.appendChild(h("div",{class:"msg-meta"},meta.join(" · ")));
+    }
+    bubble.addEventListener("click",()=>{showMsgMenu(m,bubble)});
+    wrap.appendChild(av);wrap.appendChild(bw);
+    return wrap;
+  }
+
+  function showMsgMenu(m,bubbleEl){
+    modal({title:"消息操作",body:(b,close)=>{
+      const list=h("div",{class:"list",style:{margin:"8px 0"}});
+      list.appendChild(h("div",{class:"list-item",onClick:()=>{
+        navigator.clipboard?.writeText(m.content).then(()=>toast("已复制"));close();
+      }},h("div",{class:"li-icon"},"📋"),h("div",{class:"li-main"},"复制内容")));
+      if(m.role==="assistant"){
+        list.appendChild(h("div",{class:"list-item",onClick:()=>{
+          modal({size:"center",title:"详情",body:h("div",{style:{fontSize:14,lineHeight:1.7,padding:"4px 0 16px"}},
+            h("div",{},h("b",{},"模型: "),m.model||"-"),
+            h("div",{},h("b",{},"Provider: "),m.provider||"-"),
+            h("div",{},h("b",{},"Tokens: "),m.tokens?`输入 ${m.tokens.input||"?"} · 输出 ${m.tokens.output||"?"} · 总 ${m.tokens.total||"?"}`:"-"),
+            h("div",{},h("b",{},"温度: "),m.temperature??"-"),
+            h("div",{},h("b",{},"时间: "),m.timestamp?new Date(m.timestamp).toLocaleString("zh-CN"):"-")
+          ),actions:[{label:"关闭",primary:true,onClick:c=>c()}]});
+          close();
+        }},h("div",{class:"li-icon"},"ℹ️"),h("div",{class:"li-main"},"详情")));
+        list.appendChild(h("div",{class:"list-item",onClick:async()=>{
+          close();
+          // 重新生成:删除这条之后,以同样的请求再发
+          const idx=conv.messages.findIndex(x=>x.id===m.id);
+          if(idx>0){conv.messages.splice(idx);Store.save();renderMsgs();await callAI();}
+        }},h("div",{class:"li-icon"},"🔄"),h("div",{class:"li-main"},"重新生成")));
+      }
+      list.appendChild(h("div",{class:"list-item",onClick:async()=>{
+        close();
+        const ok=await confirm({title:"删除消息",message:"删除后无法恢复。",danger:true,confirmLabel:"删除"});
+        if(ok){conv.messages=conv.messages.filter(x=>x.id!==m.id);Store.save();renderMsgs();}
+      }},h("div",{class:"li-icon",style:{background:"#FFE5E8",color:"#E94560"}},"🗑"),h("div",{class:"li-main",style:{color:"#E94560"}},"删除")));
+      b.appendChild(list);
+    }});
+  }
+
+  function showModelPicker(){
+    modal({title:"选择模型",body:(b,close)=>{
+      const list=h("div",{class:"list",style:{margin:"8px 0"}});
+      const allModels=getAllModels();
+      for(const{provider,model,label} of allModels){
+        const active=provider===curProvider&&model===curModel;
+        list.appendChild(h("div",{class:"list-item",onClick:()=>{
+          curProvider=provider;curModel=model;
+          conv.lastProvider=provider;conv.lastModel=model;
+          Store.data.settings.lastProvider=provider;Store.data.settings.lastModel=model;
+          Store.save();refreshChips();close();
+        }},
+          h("div",{class:"li-icon"},providerIcon(provider)),
+          h("div",{class:"li-main"},label||model,h("div",{class:"li-sub"},provider)),
+          active?h("div",{class:"li-right",style:{color:"var(--primary-deep)"}},"✓"):null
+        ));
+      }
+      b.appendChild(list);
+      const help=h("div",{class:"help-text"},"没有看到想要的模型?去「自定义 → API 配置」添加自定义模型。");
+      b.appendChild(help);
+    }});
+  }
+
+  function showTempPicker(){
+    modal({size:"center",title:"温度参数",body:(b,close)=>{
+      const v=h("div",{style:{textAlign:"center",fontSize:32,fontWeight:700,padding:"8px 0",color:"var(--primary-deep)"}},curTemp.toFixed(2));
+      b.appendChild(v);
+      const r=h("input",{type:"range",min:0,max:2,step:0.05,value:curTemp});
+      r.addEventListener("input",()=>{curTemp=parseFloat(r.value);v.textContent=curTemp.toFixed(2)});
+      b.appendChild(r);
+      b.appendChild(h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text-mute)",marginTop:6,padding:"0 4px"}},
+        h("span",{},"严谨 0"),h("span",{},"平衡 1.0"),h("span",{},"放飞 2.0")
+      ));
+    },actions:[{label:"取消",onClick:c=>{curTemp=conv.temperature??asst.temperature??0.7;c();}},{label:"保存",primary:true,onClick:c=>{conv.temperature=curTemp;Store.save();refreshChips();c();}}]});
+  }
+
+  function showConvMenu(conv,asst){
+    modal({title:"对话设置",body:(b,close)=>{
+      const list=h("div",{class:"list",style:{margin:"8px 0"}});
+      list.appendChild(h("div",{class:"list-item",onClick:async()=>{
+        close();
+        const newTitle=prompt("对话标题",conv.title||"");
+        if(newTitle!==null){conv.title=newTitle.trim();Store.save();render();}
+      }},h("div",{class:"li-icon"},"✏️"),h("div",{class:"li-main"},"重命名对话",h("div",{class:"li-sub"},conv.title||"未命名"))));
+      list.appendChild(h("div",{class:"list-item",onClick:()=>{close();Router.go("assistant-edit",{id:asst.id})}},
+        h("div",{class:"li-icon"},"🤖"),h("div",{class:"li-main"},"编辑助手",h("div",{class:"li-sub"},asst.name))));
+      list.appendChild(h("div",{class:"list-item",onClick:async()=>{
+        close();
+        const ok=await confirm({title:"清空消息",message:"对话保留,但所有消息会被删除。",danger:true,confirmLabel:"清空"});
+        if(ok){conv.messages=[];Store.save();renderMsgs();}
+      }},h("div",{class:"li-icon"},"🧹"),h("div",{class:"li-main"},"清空消息")));
+      list.appendChild(h("div",{class:"list-item",onClick:async()=>{
+        close();
+        const ok=await confirm({title:"删除对话",message:"删除后无法恢复。",danger:true,confirmLabel:"删除"});
+        if(ok){Store.data.conversations=Store.data.conversations.filter(x=>x.id!==conv.id);Store.save();Router.back();}
+      }},h("div",{class:"li-icon",style:{background:"#FFE5E8",color:"#E94560"}},"🗑"),h("div",{class:"li-main",style:{color:"#E94560"}},"删除对话")));
+      b.appendChild(list);
+    }});
+  }
+
+  async function send(){
+    const text=ta.value.trim();
+    if(!text)return;
+    ta.value="";ta.style.height="auto";sendBtn.disabled=true;
+    const um={id:uid(),role:"user",content:text,timestamp:Date.now()};
+    conv.messages.push(um);
+    conv.updatedAt=Date.now();
+    if(!conv.title)conv.title=text.slice(0,20);
+    Store.save();renderMsgs();
+    await callAI();
+  }
+
+  async function callAI(){
+    const apiKey=Store.data.apiKeys[curProvider];
+    if(!apiKey){
+      conv.messages.push({id:uid(),role:"assistant",content:`还没设置 ${curProvider} 的 API key。\n去「自定义 → API 配置」填一下吧。`,error:true,timestamp:Date.now()});
+      Store.save();renderMsgs();return;
+    }
+    // 准备消息
+    const memLimit=Store.data.settings.memoryLimit||30;
+    const recent=conv.messages.filter(m=>!m.error&&m.content).slice(-memLimit);
+    // 不带刚生成的占位
+    const aiMsg={id:uid(),role:"assistant",content:"",model:curModel,provider:curProvider,temperature:curTemp,streaming:true,timestamp:Date.now()};
+    conv.messages.push(aiMsg);renderMsgs();
+
+    const ac=new AbortController();
+    activeStreams.set(conv.id,ac);
+
+    try{
+      await callProvider({
+        provider:curProvider,model:curModel,apiKey,
+        baseUrl:Store.data.apiBaseUrls[curProvider],
+        systemPrompt:asst.systemPrompt||"",
+        messages:recent.filter(m=>m.id!==aiMsg.id).map(m=>({role:m.role,content:m.content})),
+        temperature:curTemp,
+        signal:ac.signal,
+        onDelta:(chunk)=>{
+          aiMsg.content+=chunk;
+          // 局部更新
+          const el=msgsEl.querySelector(`[data-msg-id="${aiMsg.id}"]`);
+          if(el){el.innerHTML=escapeHtml(aiMsg.content)+'<span class="loading-dots"><span></span><span></span><span></span></span>';msgsEl.scrollTop=msgsEl.scrollHeight;}
+        },
+        onUsage:(u)=>{aiMsg.tokens=u},
+      });
+      aiMsg.streaming=false;
+      conv.updatedAt=Date.now();
+      Store.save();renderMsgs();
+    }catch(err){
+      aiMsg.streaming=false;
+      if(err.name==="AbortError"){
+        if(!aiMsg.content)aiMsg.content="(已停止)";
+      }else{
+        aiMsg.error=true;
+        aiMsg.content=`请求失败: ${err.message}\n\n如果是网络/CORS 错误，请检查 API key、网络，或考虑通过代理调用。`;
+      }
+      Store.save();renderMsgs();
+    }finally{
+      activeStreams.delete(conv.id);
+    }
+  }
+
+  renderMsgs();
+  return s;
+}
+
+/* ============ 模型列表 ============ */
+const DEFAULT_MODELS={
+  openai:[
+    {model:"gpt-4o",label:"GPT-4o"},
+    {model:"gpt-4o-mini",label:"GPT-4o mini"},
+    {model:"gpt-4-turbo",label:"GPT-4 Turbo"},
+    {model:"o1-mini",label:"o1 mini"},
+    {model:"o1",label:"o1"}
+  ],
+  anthropic:[
+    {model:"claude-opus-4-5",label:"Claude Opus 4.5"},
+    {model:"claude-sonnet-4-5",label:"Claude Sonnet 4.5"},
+    {model:"claude-haiku-4-5",label:"Claude Haiku 4.5"},
+    {model:"claude-3-5-sonnet-20241022",label:"Claude 3.5 Sonnet"}
+  ],
+  glm:[
+    {model:"glm-4-plus",label:"GLM-4 Plus"},
+    {model:"glm-4-air",label:"GLM-4 Air"},
+    {model:"glm-4-flash",label:"GLM-4 Flash"}
+  ],
+  siliconflow:[
+    {model:"deepseek-ai/DeepSeek-V3",label:"DeepSeek V3 (硅基)"},
+    {model:"Qwen/Qwen2.5-72B-Instruct",label:"Qwen 2.5 72B"},
+    {model:"meta-llama/Meta-Llama-3.1-70B-Instruct",label:"Llama 3.1 70B"}
+  ],
+  deepseek:[
+    {model:"deepseek-chat",label:"DeepSeek Chat"},
+    {model:"deepseek-reasoner",label:"DeepSeek R1"}
+  ]
+};
+function getAllModels(){
+  const out=[];
+  for(const p of Object.keys(DEFAULT_MODELS)){
+    for(const m of DEFAULT_MODELS[p])out.push({provider:p,model:m.model,label:m.label});
+    for(const m of(Store.data.customModels[p]||[]))out.push({provider:p,model:m,label:m+" (自定义)"});
+  }
+  return out;
+}
+function providerIcon(p){return{openai:"🟢",anthropic:"🟠",glm:"🔵",siliconflow:"🟣",deepseek:"🐬"}[p]||"🤖";}
+
+/* ============ Provider 调用 ============ */
+async function callProvider({provider,model,apiKey,baseUrl,systemPrompt,messages,temperature,signal,onDelta,onUsage}){
+  if(provider==="anthropic"){
+    return callAnthropic({model,apiKey,baseUrl,systemPrompt,messages,temperature,signal,onDelta,onUsage});
+  }
+  return callOpenAICompatible({provider,model,apiKey,baseUrl,systemPrompt,messages,temperature,signal,onDelta,onUsage});
+}
+
+async function callOpenAICompatible({provider,model,apiKey,baseUrl,systemPrompt,messages,temperature,signal,onDelta,onUsage}){
+  const url=baseUrl.replace(/\/$/,"")+"/chat/completions";
+  const body={
+    model,
+    messages:[...(systemPrompt?[{role:"system",content:systemPrompt}]:[]),...messages],
+    temperature,
+    stream:true,
+    stream_options:{include_usage:true}
+  };
+  // o1系列不支持温度
+  if(model.startsWith("o1")){delete body.temperature;}
+  const res=await fetch(url,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","Authorization":`Bearer ${apiKey}`},
+    body:JSON.stringify(body),
+    signal
+  });
+  if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t.slice(0,300)}`);}
+  await readSSE(res,(data)=>{
+    if(data==="[DONE]")return;
+    let j;try{j=JSON.parse(data)}catch{return}
+    const delta=j.choices?.[0]?.delta?.content;
+    if(delta)onDelta(delta);
+    if(j.usage)onUsage({input:j.usage.prompt_tokens,output:j.usage.completion_tokens,total:j.usage.total_tokens});
+  });
+}
+
+async function callAnthropic({model,apiKey,baseUrl,systemPrompt,messages,temperature,signal,onDelta,onUsage}){
+  const url=baseUrl.replace(/\/$/,"")+"/messages";
+  // anthropic的messages不能有system role
+  const cleanMsgs=messages.filter(m=>m.role==="user"||m.role==="assistant");
+  // 第一条必须是user
+  while(cleanMsgs.length&&cleanMsgs[0].role!=="user")cleanMsgs.shift();
+  const body={
+    model,
+    max_tokens:4096,
+    messages:cleanMsgs,
+    temperature,
+    stream:true
+  };
+  if(systemPrompt)body.system=systemPrompt;
+  const res=await fetch(url,{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "x-api-key":apiKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body:JSON.stringify(body),
+    signal
+  });
+  if(!res.ok){const t=await res.text();throw new Error(`HTTP ${res.status}: ${t.slice(0,300)}`);}
+  let inputTokens=0,outputTokens=0;
+  await readSSE(res,(data)=>{
+    let j;try{j=JSON.parse(data)}catch{return}
+    if(j.type==="content_block_delta"&&j.delta?.text){onDelta(j.delta.text);}
+    else if(j.type==="message_start"&&j.message?.usage){inputTokens=j.message.usage.input_tokens||0;}
+    else if(j.type==="message_delta"&&j.usage){outputTokens=j.usage.output_tokens||outputTokens;}
+  });
+  if(inputTokens||outputTokens)onUsage({input:inputTokens,output:outputTokens,total:inputTokens+outputTokens});
+}
+
+async function readSSE(res,onData){
+  const reader=res.body.getReader();
+  const dec=new TextDecoder();
+  let buf="";
+  while(true){
+    const{value,done}=await reader.read();
+    if(done)break;
+    buf+=dec.decode(value,{stream:true});
+    const lines=buf.split("\n");
+    buf=lines.pop();
+    for(const line of lines){
+      const t=line.trim();
+      if(!t)continue;
+      if(t.startsWith("data:"))onData(t.slice(5).trim());
+    }
+  }
+  if(buf.trim().startsWith("data:"))onData(buf.trim().slice(5).trim());
+}
+
+/* ============ 自定义(设置)主页 ============ */
+function renderSettings(){
+  const s=h("div",{class:"screen app-screen"});
+  s.appendChild(h("div",{class:"page-header"},
+    h("button",{class:"btn-text",onClick:()=>Router.back()},"← 返回"),
+    h("div",{class:"title"},"自定义"),
+    h("div",{style:{width:60}})
+  ));
+  const body=h("div",{class:"page-body"});
+  body.appendChild(h("div",{class:"section"},"个性"));
+  const list1=h("div",{class:"list"});
+  list1.appendChild(itemRow({icon:"👤",label:"个人资料",sub:Store.data.user.name,onClick:()=>Router.go("profile")}));
+  list1.appendChild(itemRow({icon:"🎨",label:"主题与外观",sub:THEMES[Store.data.theme.preset]?.name||"自定义",onClick:()=>Router.go("appearance")}));
+  body.appendChild(list1);
+
+  body.appendChild(h("div",{class:"section"},"AI"));
+  const list2=h("div",{class:"list"});
+  list2.appendChild(itemRow({icon:"🔑",label:"API 配置",sub:countConfiguredKeys()+" 个已配置",onClick:()=>Router.go("api-keys")}));
+  list2.appendChild(itemRow({icon:"🤖",label:"助手管理",sub:Store.data.assistants.length+" 个助手",onClick:()=>Router.go("assistants")}));
+  body.appendChild(list2);
+
+  body.appendChild(h("div",{class:"section"},"高级"));
+  const list3=h("div",{class:"list"});
+  list3.appendChild(itemRow({icon:"💾",label:"导出数据",sub:"备份所有对话与设置",onClick:exportData}));
+  list3.appendChild(itemRow({icon:"📥",label:"导入数据",sub:"从备份恢复",onClick:importData}));
+  list3.appendChild(itemRow({icon:"⚠️",label:"清空所有数据",danger:true,onClick:async()=>{
+    const ok=await confirm({title:"清空全部",message:"会删除所有对话、设置、API key，无法恢复。",danger:true,confirmLabel:"清空"});
+    if(ok){localStorage.removeItem(Store.KEY);Store.load();applyTheme();Router.reset();toast("已清空")}
+  }}));
+  body.appendChild(list3);
+
+  body.appendChild(h("div",{style:{height:32}}));
+  s.appendChild(body);
+  return s;
+}
+
+function itemRow({icon,label,sub,right,onClick,danger}){
+  const item=h("div",{class:"list-item",onClick:onClick});
+  if(icon)item.appendChild(h("div",{class:"li-icon",style:danger?{background:"#FFE5E8",color:"#E94560"}:{}},icon));
+  const main=h("div",{class:"li-main",style:danger?{color:"#E94560"}:{}},label);
+  if(sub)main.appendChild(h("div",{class:"li-sub"},sub));
+  item.appendChild(main);
+  if(right)item.appendChild(right instanceof Node?right:h("div",{class:"li-right"},right));
+  if(onClick&&!right)item.appendChild(h("div",{class:"li-right"},h("span",{class:"arrow"},"›")));
+  return item;
+}
+
+function countConfiguredKeys(){return Object.values(Store.data.apiKeys).filter(k=>k&&k.trim()).length}
+
+/* ============ 个人资料 ============ */
+function renderProfile(){
+  const s=h("div",{class:"screen app-screen"});
+  s.appendChild(h("div",{class:"page-header"},
+    h("button",{class:"btn-text",onClick:()=>Router.back()},"← 返回"),
+    h("div",{class:"title"},"个人资料"),
+    h("div",{style:{width:60}})
+  ));
+  const body=h("div",{class:"page-body"});
+  // 头像区
+  const avBox=h("div",{style:{padding:"24px 16px",textAlign:"center"}});
+  const av=renderAvatar({name:Store.data.user.name,avatar:Store.data.user.avatar,size:"xl",color:Store.data.theme.primary});
+  avBox.appendChild(av);
+  const fileInput=h("input",{type:"file",accept:"image/*",style:{display:"none"}});
+  fileInput.addEventListener("change",async(e)=>{
+    const f=e.target.files[0];if(!f)return;
+    const dataUrl=await fileToDataURL(f,256);
+    Store.data.user.avatar=dataUrl;Store.save();render();
+  });
+  const btnRow=h("div",{style:{display:"flex",gap:8,justifyContent:"center",marginTop:14}},
+    h("button",{class:"btn-secondary",onClick:()=>fileInput.click()},"📷 上传头像"),
+    Store.data.user.avatar?h("button",{class:"btn-danger",onClick:()=>{Store.data.user.avatar=null;Store.save();render();}},"清除"):null
+  );
+  avBox.appendChild(btnRow);
+  avBox.appendChild(fileInput);
+  body.appendChild(avBox);
+
+  body.appendChild(h("div",{class:"section"},"信息"));
+  const inputs=h("div",{class:"input-block"});
+  const nameRow=h("div",{class:"input-row"},
+    h("label",{},"昵称"),
+    h("input",{type:"text",value:Store.data.user.name||"",placeholder:"昭昭"})
+  );
+  nameRow.querySelector("input").addEventListener("change",e=>{Store.data.user.name=e.target.value.trim()||"昭昭";Store.save();});
+  inputs.appendChild(nameRow);
+  const devRow=h("div",{class:"input-row"},
+    h("label",{},"设备名称"),
+    h("input",{type:"text",value:Store.data.deviceName,placeholder:"Snowball"})
+  );
+  devRow.querySelector("input").addEventListener("change",e=>{Store.data.deviceName=e.target.value.trim()||"Snowball";Store.save();});
+  inputs.appendChild(devRow);
+  body.appendChild(inputs);
+  body.appendChild(h("div",{class:"help-text"},"昵称会显示在聊天中和默认头像上(取首字母)。设备名称会出现在「关于」页。"));
+  s.appendChild(body);
+  return s;
+}
+
+async function fileToDataURL(file,maxSize=512){
+  return new Promise((res,rej)=>{
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        // 缩放
+        let{width,height}=img;
+        if(width>maxSize||height>maxSize){
+          if(width>height){height=height*maxSize/width;width=maxSize;}
+          else{width=width*maxSize/height;height=maxSize;}
+        }
+        const c=document.createElement("canvas");
+        c.width=width;c.height=height;
+        c.getContext("2d").drawImage(img,0,0,width,height);
+        res(c.toDataURL("image/jpeg",0.85));
+      };
+      img.onerror=rej;
+      img.src=reader.result;
+    };
+    reader.onerror=rej;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ============ 主题与外观 ============ */
+function renderAppearance(){
+  const s=h("div",{class:"screen app-screen"});
+  s.appendChild(h("div",{class:"page-header"},
+    h("button",{class:"btn-text",onClick:()=>Router.back()},"← 返回"),
+    h("div",{class:"title"},"主题与外观"),
+    h("div",{style:{width:60}})
+  ));
+  const body=h("div",{class:"page-body"});
+
+  body.appendChild(h("div",{class:"section"},"主题"));
+  const grid=h("div",{style:{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:12,padding:"0 14px"}});
+  for(const id of Object.keys(THEMES)){
+    const t=THEMES[id];
+    const active=Store.data.theme.preset===id;
+    const card=h("div",{class:"theme-card"+(active?" active":""),onClick:()=>{
+      Store.data.theme={preset:id,primary:t.primary,primarySoft:t.primarySoft,bg:t.bg,bgElev:t.bgElev,text:t.text,textSoft:t.textSoft};
+      Store.save();applyTheme();render();
+    },style:{background:t.bgElev}},
+      h("div",{class:"theme-preview",style:{background:t.wallpaper}},
+        h("div",{class:"dot",style:{background:t.primary}}),
+        h("div",{class:"dot",style:{background:t.primarySoft}}),
+        h("div",{class:"dot",style:{background:t.bgElev,border:"1px solid rgba(0,0,0,.05)"}})
+      ),
+      h("div",{style:{padding:"10px 12px",fontSize:13,fontWeight:500,color:t.text,background:t.bgElev}},t.name)
+    );
+    grid.appendChild(card);
+  }
+  body.appendChild(grid);
+
+  body.appendChild(h("div",{class:"section"},"主色调"));
+  body.appendChild(h("div",{class:"help-text"},"在当前主题基础上替换主色,会立即生效。"));
+  const colorBox=h("div",{style:{padding:"4px 14px"}});
+  const colorList=h("div",{class:"input-block"});
+  const colorRow=h("div",{class:"input-row",style:{flexDirection:"row",alignItems:"center",justifyContent:"space-between"}},
+    h("div",{},
+      h("label",{style:{marginBottom:0}},"自定义主色"),
+      h("div",{style:{fontSize:13,color:"var(--text-soft)",marginTop:2}},Store.data.theme.primary)
+    ),
+    h("input",{type:"color",value:Store.data.theme.primary,oninput:(e)=>{
+      Store.data.theme.primary=e.target.value;Store.save();applyTheme();
+    }})
+  );
+  colorList.appendChild(colorRow);
+  colorBox.appendChild(colorList);
+  body.appendChild(colorBox);
+
+  body.appendChild(h("div",{class:"section"},"壁纸"));
+  const wpFile=h("input",{type:"file",accept:"image/*",style:{display:"none"}});
+  wpFile.addEventListener("change",async(e)=>{
+    const f=e.target.files[0];if(!f)return;
+    const dataUrl=await fileToDataURL(f,1600);
+    Store.data.wallpaper=dataUrl;Store.save();applyTheme();
+  });
+  const wpList=h("div",{class:"list"});
+  wpList.appendChild(itemRow({icon:"🖼",label:"从相册选择",onClick:()=>wpFile.click()}));
+  if(Store.data.wallpaper){
+    wpList.appendChild(itemRow({icon:"🔄",label:"恢复主题默认壁纸",onClick:()=>{Store.data.wallpaper=null;Store.save();applyTheme();render();}}));
+  }
+  body.appendChild(wpList);
+  body.appendChild(wpFile);
+
+  body.appendChild(h("div",{style:{height:32}}));
+  s.appendChild(body);
+  return s;
+}
+
+/* ============ API 配置 ============ */
+function renderApiKeys(){
+  const s=h("div",{class:"screen app-screen"});
+  s.appendChild(h("div",{class:"page-header"},
+    h("button",{class:"btn-text",onClick:()=>Router.back()},"← 返回"),
+    h("div",{class:"title"},"API 配置"),
+    h("div",{style:{width:60}})
+  ));
+  const body=h("div",{class:"page-body"});
+  body.appendChild(h("div",{class:"help-text"},"API key 只保存在你的浏览器里,不会上传任何地方。"));
+
+  const providers=[
+    {id:"openai",name:"OpenAI",hint:"sk-..."},
+    {id:"anthropic",name:"Anthropic (Claude)",hint:"sk-ant-..."},
+    {id:"glm",name:"智谱 GLM",hint:"xxx.xxx"},
+    {id:"siliconflow",name:"硅基流动",hint:"sk-..."},
+    {id:"deepseek",name:"DeepSeek",hint:"sk-..."}
+  ];
+  for(const p of providers){
+    body.appendChild(h("div",{class:"section"},p.name));
+    const list=h("div",{class:"input-block"});
+    // key
+    const keyRow=h("div",{class:"input-row"},
+      h("label",{},"API Key"),
+      h("input",{type:"password",value:Store.data.apiKeys[p.id]||"",placeholder:p.hint,autocomplete:"off"})
+    );
+    keyRow.querySelector("input").addEventListener("change",e=>{Store.data.apiKeys[p.id]=e.target.value.trim();Store.save();render();});
+    list.appendChild(keyRow);
+    // base url
+    const baseRow=h("div",{class:"input-row"},
+      h("label",{},"Base URL"),
+      h("input",{type:"text",value:Store.data.apiBaseUrls[p.id]||"",placeholder:"自定义代理地址"})
+    );
+    baseRow.querySelector("input").addEventListener("change",e=>{Store.data.apiBaseUrls[p.id]=e.target.value.trim();Store.save();});
+    list.appendChild(baseRow);
+    // 自定义模型
+    const cmRow=h("div",{class:"input-row"},
+      h("label",{},"自定义模型 (一行一个)"),
+      h("textarea",{rows:2,placeholder:"例如:gpt-4o-2024-11-20",value:(Store.data.customModels[p.id]||[]).join("\n")})
+    );
+    cmRow.querySelector("textarea").addEventListener("change",e=>{
+      Store.data.customModels[p.id]=e.target.value.split("\n").map(x=>x.trim()).filter(Boolean);
+      Store.save();
+    });
+    list.appendChild(cmRow);
+    body.appendChild(list);
+  }
+  body.appendChild(h("div",{style:{height:32}}));
+  s.appendChild(body);
+  return s;
+}
+
+/* ============ 助手 ============ */
+function renderAssistants(){
+  const s=h("div",{class:"screen app-screen"});
+  s.appendChild(h("div",{class:"page-header"},
+    h("button",{class:"btn-text",onClick:()=>Router.back()},"← 返回"),
+    h("div",{class:"title"},"助手"),
+    h("button",{class:"btn-icon",onClick:()=>{
+      const a={id:uid(),name:"新助手",avatar:null,systemPrompt:"",defaultProvider:Store.data.settings.lastProvider||"openai",defaultModel:Store.data.settings.lastModel||"gpt-4o-mini",temperature:0.7,note:"",createdAt:Date.now()};
+      Store.data.assistants.push(a);Store.save();Router.go("assistant-edit",{id:a.id});
+    }},h("span",{style:{fontSize:24,fontWeight:300}},"+"))
+  ));
+  const body=h("div",{class:"page-body"});
+  body.appendChild(h("div",{class:"help-text"},"助手 = 一个预设的人设(系统提示词 + 默认模型 + 头像)。新建对话时选一个助手。"));
+  const list=h("div",{class:"list"});
+  for(const a of Store.data.assistants){
+    list.appendChild(h("div",{class:"list-item",onClick:()=>Router.go("assistant-edit",{id:a.id})},
+      renderAvatar({name:a.name,avatar:a.avatar,size:"md",color:Store.data.theme.primary}),
+      h("div",{class:"li-main"},a.name,h("div",{class:"li-sub"},a.note||a.systemPrompt?.slice(0,40)||`${a.defaultProvider}/${a.defaultModel}`)),
+      h("div",{class:"li-right"},h("span",{class:"arrow"},"›"))
+    ));
+  }
+  body.appendChild(list);
+  s.appendChild(body);
+  return s;
+}
+
+function renderAssistantEdit(opts){
+  const a=Store.data.assistants.find(x=>x.id===opts?.id);
+  if(!a){Router.back();return h("div");}
+  const s=h("div",{class:"screen app-screen"});
+  s.appendChild(h("div",{class:"page-header"},
+    h("button",{class:"btn-text",onClick:()=>Router.back()},"← 返回"),
+    h("div",{class:"title"},"编辑助手"),
+    h("div",{style:{width:60}})
+  ));
+  const body=h("div",{class:"page-body"});
+
+  // 头像
+  const avBox=h("div",{style:{padding:"20px 16px",textAlign:"center"}});
+  const av=renderAvatar({name:a.name,avatar:a.avatar,size:"xl",color:Store.data.theme.primary});
+  avBox.appendChild(av);
+  const fileInput=h("input",{type:"file",accept:"image/*",style:{display:"none"}});
+  fileInput.addEventListener("change",async(e)=>{
+    const f=e.target.files[0];if(!f)return;
+    a.avatar=await fileToDataURL(f,256);Store.save();render();
+  });
+  const btns=h("div",{style:{display:"flex",gap:8,justifyContent:"center",marginTop:12}},
+    h("button",{class:"btn-secondary",onClick:()=>fileInput.click()},"📷 上传头像"),
+    a.avatar?h("button",{class:"btn-danger",onClick:()=>{a.avatar=null;Store.save();render();}},"清除"):null
+  );
+  avBox.appendChild(btns);
+  avBox.appendChild(fileInput);
+  body.appendChild(avBox);
+
+  body.appendChild(h("div",{class:"section"},"基本信息"));
+  const list1=h("div",{class:"input-block"});
+  const nameRow=h("div",{class:"input-row"},h("label",{},"名称"),h("input",{type:"text",value:a.name||"",placeholder:"我的助手"}));
+  nameRow.querySelector("input").addEventListener("change",e=>{a.name=e.target.value.trim()||"未命名";Store.save();});
+  list1.appendChild(nameRow);
+  const noteRow=h("div",{class:"input-row"},h("label",{},"备注"),h("input",{type:"text",value:a.note||"",placeholder:"给自己看的备注"}));
+  noteRow.querySelector("input").addEventListener("change",e=>{a.note=e.target.value;Store.save();});
+  list1.appendChild(noteRow);
+  body.appendChild(list1);
+
+  body.appendChild(h("div",{class:"section"},"系统提示词"));
+  const sp=h("div",{class:"input-block"});
+  const spRow=h("div",{class:"input-row"},
+    h("label",{},`${(a.systemPrompt||"").length} 字`),
+    h("textarea",{rows:8,placeholder:"在这里写人设、说话风格、规则...\n例如: 你是一个温柔耐心的学习助手,用中文回答。",value:a.systemPrompt||""})
+  );
+  spRow.querySelector("textarea").addEventListener("input",e=>{a.systemPrompt=e.target.value;spRow.querySelector("label").textContent=`${e.target.value.length} 字`;});
+  spRow.querySelector("textarea").addEventListener("change",()=>Store.save());
+  sp.appendChild(spRow);
+  body.appendChild(sp);
+
+  body.appendChild(h("div",{class:"section"},"默认参数"));
+  const list2=h("div",{class:"list"});
+  const allModels=getAllModels();
+  const curLabel=allModels.find(m=>m.provider===a.defaultProvider&&m.model===a.defaultModel)?.label||a.defaultModel;
+  list2.appendChild(itemRow({icon:"🤖",label:"默认模型",sub:`${a.defaultProvider} · ${curLabel}`,onClick:()=>{
+    modal({title:"选择默认模型",body:(b,close)=>{
+      const inner=h("div",{class:"list",style:{margin:"8px 0"}});
+      for(const m of allModels){
+        const active=m.provider===a.defaultProvider&&m.model===a.defaultModel;
+        inner.appendChild(h("div",{class:"list-item",onClick:()=>{
+          a.defaultProvider=m.provider;a.defaultModel=m.model;Store.save();close();render();
+        }},h("div",{class:"li-icon"},providerIcon(m.provider)),h("div",{class:"li-main"},m.label,h("div",{class:"li-sub"},m.provider)),active?h("div",{class:"li-right",style:{color:"var(--primary-deep)"}},"✓"):null));
+      }
+      b.appendChild(inner);
+    }});
+  }}));
+  const tempItem=itemRow({icon:"🌡",label:"默认温度",sub:(a.temperature??0.7).toFixed(2),onClick:()=>{
+    modal({size:"center",title:"默认温度",body:(b,close)=>{
+      let v=a.temperature??0.7;
+      const display=h("div",{style:{textAlign:"center",fontSize:32,fontWeight:700,color:"var(--primary-deep)",padding:"8px 0"}},v.toFixed(2));
+      b.appendChild(display);
+      const r=h("input",{type:"range",min:0,max:2,step:0.05,value:v});
+      r.addEventListener("input",()=>{v=parseFloat(r.value);display.textContent=v.toFixed(2);});
+      b.appendChild(r);
+      b.appendChild(h("div",{style:{display:"flex",justifyContent:"space-between",fontSize:11,color:"var(--text-mute)",marginTop:6}},
+        h("span",{},"严谨 0"),h("span",{},"平衡 1"),h("span",{},"放飞 2")));
+    },actions:[{label:"取消",onClick:c=>c()},{label:"保存",primary:true,onClick:c=>{const v=parseFloat($(".modal input[type='range']").value);a.temperature=v;Store.save();c();render();}}]});
+  }});
+  list2.appendChild(tempItem);
+  body.appendChild(list2);
+
+  body.appendChild(h("div",{style:{height:16}}));
+  if(Store.data.assistants.length>1){
+    body.appendChild(h("button",{class:"btn-danger btn-block",style:{margin:"0 14px",width:"calc(100% - 28px)"},onClick:async()=>{
+      const ok=await confirm({title:"删除助手",message:`删除助手「${a.name}」?使用此助手的对话不会被删除,但会回退到默认助手。`,danger:true,confirmLabel:"删除"});
+      if(ok){
+        Store.data.assistants=Store.data.assistants.filter(x=>x.id!==a.id);
+        // 把使用此助手的对话指向第一个助手
+        for(const c of Store.data.conversations)if(c.assistantId===a.id)c.assistantId=Store.data.assistants[0].id;
+        Store.save();Router.back();
+      }
+    }},"删除助手"));
+  }
+  body.appendChild(h("div",{style:{height:32}}));
+  s.appendChild(body);
+  return s;
+}
+
+/* ============ 导入导出 ============ */
+function exportData(){
+  const blob=new Blob([JSON.stringify(Store.data,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download=`snowball-backup-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();URL.revokeObjectURL(url);toast("已导出");
+}
+function importData(){
+  const f=h("input",{type:"file",accept:".json,application/json",style:{display:"none"}});
+  f.addEventListener("change",async e=>{
+    const file=e.target.files[0];if(!file)return;
+    try{
+      const txt=await file.text();
+      const data=JSON.parse(txt);
+      const ok=await confirm({title:"导入数据",message:"会覆盖当前所有数据(对话、设置、API key)。确定继续?",danger:true,confirmLabel:"导入并覆盖"});
+      if(ok){Store.data=data;Store.save();applyTheme();Router.reset();toast("导入成功");}
+    }catch(err){toast("文件格式错误: "+err.message);}
+  });
+  document.body.appendChild(f);f.click();setTimeout(()=>f.remove(),1000);
+}
+
+/* ============ 时钟 ============ */
+function tickClock(){
+  const d=new Date();
+  $("#sb-time").textContent=`${d.getHours()}:${d.getMinutes().toString().padStart(2,"0")}`;
+}
+
+/* ============ 启动 ============ */
+Store.load();
+applyTheme();
+render();
+tickClock();setInterval(tickClock,30000);
+
+// 物理返回键(浏览器后退)
+window.addEventListener("popstate",()=>{Router.back()});
+// 阻止双指缩放
+document.addEventListener("gesturestart",e=>e.preventDefault());
+
+</script>
+
+</body>
+</html>
